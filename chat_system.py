@@ -672,11 +672,31 @@ conversation_manager = ConversationManager()
 # Lifespan
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await conversation_manager.connect_redis()
-    logger.info("Application started")
-    yield
+    # Startup
+    logger.info("🚀 Starting application...")
+    
+    # Initialize database tables
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Database initialized successfully")
+    except Exception as e:
+        logger.error(f"❌ Database initialization failed: {e}")
+    
+    # Connect to Redis
+    try:
+        await conversation_manager.connect_redis()
+        logger.info("✅ Redis connected")
+    except Exception as e:
+        logger.warning(f"⚠️ Redis connection failed: {e}")
+    
+    logger.info("✅ Application started")
+    
+    yield  # App runs here
+    
+    # Shutdown
+    logger.info("🛑 Shutting down application...")
     await conversation_manager.disconnect_redis()
-    logger.info("Application shutdown")
+    logger.info("✅ Application shutdown complete")
 
 # FastAPI app
 app = FastAPI(title="Enhanced Chat System", lifespan=lifespan)
