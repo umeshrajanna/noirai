@@ -1,0 +1,143 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: chat-postgres
+    environment:
+      POSTGRES_DB: chatdb
+      POSTGRES_USER: chatuser
+      POSTGRES_PASSWORD: chatpass123
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U chatuser -d chatdb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - chat-network
+    restart: unless-stopped
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: chat-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+    networks:
+      - chat-network
+    restart: unless-stopped
+
+  # Chat Application - DEVELOPMENT MODE WITH HOT RELOAD
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: chat-app
+    
+    # 🔥🔥🔥 HOT RELOAD ENABLED HERE 🔥🔥🔥
+    # This overrides the Dockerfile CMD and enables --reload flag
+    # Any changes to chat_system.py will automatically reload the app!
+    command: uvicorn chat_system:app --host 0.0.0.0 --port 8000 --reload --log-level info
+    
+    environment:
+      # Database
+      DATABASE_URL: postgresql://chatuser:chatpass123@postgres:5432/chatdb
+      
+      # Redis
+      REDIS_URL: redis://redis:6379
+      
+      # API Keys (replace with your actual keys or use .env file)
+      CLAUDE_API_KEY: ${CLAUDE_API_KEY}
+      SERPAPI_KEY: ${SERPAPI_KEY}
+      TWOCAPTCHA_KEY: ${TWOCAPTCHA_KEY:-}
+      ALPHA_VANTAGE_KEY: ${ALPHA_VANTAGE_KEY:-demo}
+      OPENWEATHER_KEY: ${OPENWEATHER_KEY:-demo}
+      NEWSAPI_KEY: ${NEWSAPI_KEY:-demo}
+      
+      # Application Settings
+      APP_ENV: development
+      LOG_LEVEL: info
+    
+    ports:
+      - "8000:8000"
+    
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    
+    networks:
+      - chat-network
+    
+    restart: unless-stopped
+    
+    # 🔥🔥🔥 VOLUME MOUNTS FOR HOT RELOAD 🔥🔥🔥
+    # These make your local files available inside the container
+    # When you edit chat_system.py locally, the container sees the changes
+    volumes:
+      - ./logs:/app/logs
+      - ./chat_system.py:/app/chat_system.py    # 🔥 This enables hot reload!
+      - ./.env:/app/.env
+    
+    # Run as root in dev to avoid permission issues with volume mounts
+    user: root
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+
+networks:
+  chat-network:
+    driver: bridge
+
+# =====================================================
+# 📖 USAGE INSTRUCTIONS
+# =====================================================
+#
+# 🔥 DEVELOPMENT MODE (Current Configuration):
+# ---------------------------------------------
+# Hot reload is ENABLED! Edit chat_system.py and see instant changes!
+#
+# Commands:
+#   docker-compose up -d                    # Start all services
+#   docker-compose logs -f app              # Watch live logs
+#   # Edit chat_system.py and save          # Auto-reload happens!
+#   docker-compose restart app              # Restart if needed
+#   docker-compose down                     # Stop everything
+#
+# ✅ PRODUCTION MODE:
+# -------------------
+# To switch to production mode:
+# 1. Comment out this line (around line 51):
+#    # command: uvicorn chat_system:app --host 0.0.0.0 --port 8000 --reload --log-level info
+#
+# 2. Comment out these volume mounts (around lines 86-88):
+#    # - ./chat_system.py:/app/chat_system.py
+#    # - ./.env:/app/.env
+#
+# 3. Comment out this line (around line 91):
+#    # user: root
+#
+# 4. Rebuild:
+#    docker-compose down
+#    docker-compose build --no-cache
+#    docker-compose up -d
+#
+# =====================================================
