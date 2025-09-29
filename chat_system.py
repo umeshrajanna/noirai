@@ -47,8 +47,8 @@ logger = logging.getLogger(__name__)
 # Configuration from environment variables
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://chatuser:chatpass123@localhost:5432/chatdb")
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
-CLAUDE_API_KEY = os.getenv("CLAUDE_API_KEY", "")
-SERPAPI_KEY = os.getenv("SERPAPI_KEY", "")
+CLAUDE_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+SERPAPI_KEY = os.getenv("SERPAPI_API_KEY", "")
 OPENWEATHER_KEY = os.getenv("OPENWEATHER_KEY", "")
 NEWSAPI_KEY = os.getenv("NEWSAPI_KEY", "")
 JWT_SECRET = os.getenv("JWT_SECRET", "your-secret-key-change-in-production")
@@ -1321,15 +1321,15 @@ async def test_search_apis():
     
     return results
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize database on app startup"""
-    try:
-        Base.metadata.create_all(bind=engine)
-        logger.info("✅ Database initialized")
-    except Exception as e:
-        logger.error(f"Database initialization failed: {e}")
-        # App can still start, will retry on first request
+# @app.on_event("startup")
+# async def startup_event():
+#     """Initialize database on app startup"""
+#     try:
+#         Base.metadata.create_all(bind=engine)
+#         logger.info("✅ Database initialized")
+#     except Exception as e:
+#         logger.error(f"Database initialization failed: {e}")
+#         # App can still start, will retry on first request
 
 
 @app.get("/")
