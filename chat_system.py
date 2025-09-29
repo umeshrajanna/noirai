@@ -115,8 +115,9 @@ class Reaction(Base):
     message = relationship("Message", back_populates="reactions")
 
 # Create tables
-Base.metadata.create_all(bind=engine)
-
+# Base.metadata.create_all(bind=engine)
+ 
+        
 # Pydantic Models
 class UserCreate(BaseModel):
     username: str
@@ -1299,6 +1300,17 @@ async def test_search_apis():
         }
     
     return results
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize database on app startup"""
+    try:
+        Base.metadata.create_all(bind=engine)
+        logger.info("✅ Database initialized")
+    except Exception as e:
+        logger.error(f"Database initialization failed: {e}")
+        # App can still start, will retry on first request
+
 
 @app.get("/")
 async def root():
